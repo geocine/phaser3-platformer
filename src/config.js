@@ -1,4 +1,3 @@
-/// <reference path="../node_modules/phaser/types/phaser.d.ts" />
 import Phaser from 'phaser';
 
 export default {
@@ -20,7 +19,7 @@ export default {
       gravity: {
         y: 750
       },
-      debug: true,
+      debug: false,
       debugShowVelocity: true,
       debugShowBody: true
     }

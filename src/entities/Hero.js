@@ -1,4 +1,3 @@
-/// <reference path="../../node_modules/phaser/types/phaser.d.ts" />
 import Phaser from 'phaser';
 import StateMachine from 'javascript-state-machine';
 
