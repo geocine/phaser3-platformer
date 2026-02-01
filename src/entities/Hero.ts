@@ -2,7 +2,20 @@ import Phaser from 'phaser';
 import StateMachine from 'javascript-state-machine';
 
 class Hero extends Phaser.GameObjects.Sprite {
-  constructor(scene, x, y) {
+  body!: Phaser.Physics.Arcade.Body;
+  private animState!: any;
+  private animPredicates!: Record<string, () => boolean>;
+  private moveState!: any;
+  private movePredicates!: Record<string, () => boolean>;
+  private controlState: { didPressJump?: boolean } = {};
+  private keys: Phaser.Types.Input.Keyboard.CursorKeys;
+
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    keys: Phaser.Types.Input.Keyboard.CursorKeys
+  ) {
     super(scene, x, y, 'sprite/hero/run');
 
     scene.add.existing(this);
@@ -16,8 +29,8 @@ class Hero extends Phaser.GameObjects.Sprite {
     this.body.setOffset(12, 23);
     this.body.setMaxVelocity(250, 400);
     this.body.setDragX(750);
-    this.input = {};
-    this.keys = scene.cursorKeys;
+    this.controlState = {};
+    this.keys = keys;
 
     this.setupAnimation();
     this.setupMovement();
@@ -145,10 +158,10 @@ class Hero extends Phaser.GameObjects.Sprite {
 
     this.movePredicates = {
       jump: () => {
-        return this.input.didPressJump;
+        return this.controlState.didPressJump;
       },
       flip: () => {
-        return this.input.didPressJump;
+        return this.controlState.didPressJump;
       },
       fall: () => {
         return !this.body.onFloor();
@@ -171,10 +184,10 @@ class Hero extends Phaser.GameObjects.Sprite {
     return this.moveState.is('dead');
   }
 
-  preUpdate(time, delta) {
+  preUpdate(time: number, delta: number) {
     super.preUpdate(time, delta);
 
-    this.input.didPressJump =
+    this.controlState.didPressJump =
       !this.isDead() && Phaser.Input.Keyboard.JustDown(this.keys.up);
 
     if (!this.isDead() && this.keys.left.isDown) {

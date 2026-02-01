@@ -1,8 +1,13 @@
-/// <reference path="../../node_modules/phaser/types/phaser.d.ts" />
 import Phaser from 'phaser';
 import Hero from '../entities/Hero';
 
 class Game extends Phaser.Scene {
+  private cursorKeys!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private hero!: Hero;
+  private map!: Phaser.Tilemaps.Tilemap;
+  private spikeGroup!: Phaser.Physics.Arcade.Group;
+  private spawnPos = { x: 0, y: 0 };
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -98,7 +103,7 @@ class Game extends Phaser.Scene {
   }
 
   addHero() {
-    this.hero = new Hero(this, this.spawnPos.x, this.spawnPos.y);
+    this.hero = new Hero(this, this.spawnPos.x, this.spawnPos.y, this.cursorKeys);
 
     this.cameras.main.setBounds(
       0,
@@ -137,13 +142,10 @@ class Game extends Phaser.Scene {
     const groundTiles = this.map.addTilesetImage('world-1', 'world-1-sheet');
     const backgroundTiles = this.map.addTilesetImage('clouds', 'clouds-sheet');
 
-    const backgroundLayer = this.map.createStaticLayer(
-      'Background',
-      backgroundTiles
-    );
+    const backgroundLayer = this.map.createLayer('Background', backgroundTiles);
     backgroundLayer.setScrollFactor(0.6);
 
-    const groundLayer = this.map.createStaticLayer('Ground', groundTiles);
+    const groundLayer = this.map.createLayer('Ground', groundTiles);
     groundLayer.setCollision([1, 2, 4], true);
 
     this.physics.world.setBounds(
@@ -177,7 +179,7 @@ class Game extends Phaser.Scene {
       }
     });
 
-    this.map.createStaticLayer('Foreground', groundTiles);
+    this.map.createLayer('Foreground', groundTiles);
     // const debugGraphics = this.add.graphics();
     // groundLayer.renderDebug(debugGraphics);
   }
