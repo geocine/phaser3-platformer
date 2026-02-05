@@ -7,8 +7,15 @@ class Hero extends Phaser.GameObjects.Sprite {
   private animPredicates!: Record<string, () => boolean>;
   private moveState!: any;
   private movePredicates!: Record<string, () => boolean>;
-  private controlState: { didPressJump?: boolean } = {};
+  private controlState: {
+    didPressJump?: boolean;
+    jumpBufferedUntil?: number;
+    lastOnFloorTime?: number;
+  } = {};
   private keys: Phaser.Types.Input.Keyboard.CursorKeys;
+
+  private readonly jumpBufferMs = 120;
+  private readonly coyoteTimeMs = 120;
 
   constructor(
     scene: Phaser.Scene,
@@ -118,7 +125,7 @@ class Hero extends Phaser.GameObjects.Sprite {
       transitions: [
         {
           name: 'jump',
-          from: 'standing',
+          from: ['standing', 'falling'],
           to: 'jumping'
         },
         {
@@ -158,7 +165,14 @@ class Hero extends Phaser.GameObjects.Sprite {
 
     this.movePredicates = {
       jump: () => {
-        return this.controlState.didPressJump;
+        const now = this.scene.time.now;
+        const buffered = (this.controlState.jumpBufferedUntil ?? 0) > now;
+        if (!buffered) return false;
+
+        const lastOnFloor = this.controlState.lastOnFloorTime ?? -Infinity;
+        const withinCoyote = now - lastOnFloor <= this.coyoteTimeMs;
+
+        return this.body.onFloor() || withinCoyote;
       },
       flip: () => {
         return this.controlState.didPressJump;
@@ -187,8 +201,18 @@ class Hero extends Phaser.GameObjects.Sprite {
   preUpdate(time: number, delta: number) {
     super.preUpdate(time, delta);
 
+    if (!this.isDead() && this.body.onFloor()) {
+      this.controlState.lastOnFloorTime = this.scene.time.now;
+    }
+
+    if (!this.isDead() && Phaser.Input.Keyboard.JustDown(this.keys.up)) {
+      this.controlState.jumpBufferedUntil =
+        this.scene.time.now + this.jumpBufferMs;
+    }
+
     this.controlState.didPressJump =
-      !this.isDead() && Phaser.Input.Keyboard.JustDown(this.keys.up);
+      !this.isDead() &&
+      (this.controlState.jumpBufferedUntil ?? 0) > this.scene.time.now;
 
     if (!this.isDead() && this.keys.left.isDown) {
       this.body.setAccelerationX(-1000);
@@ -214,6 +238,11 @@ class Hero extends Phaser.GameObjects.Sprite {
         this.movePredicates[transition]()
       ) {
         this.moveState[transition]();
+
+        if (transition === 'jump' || transition === 'flip') {
+          this.controlState.jumpBufferedUntil = 0;
+        }
+
         break;
       }
     }
