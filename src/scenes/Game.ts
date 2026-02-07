@@ -3,10 +3,15 @@ import Hero from '../entities/Hero';
 
 class Game extends Phaser.Scene {
   private cursorKeys!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private restartKey!: Phaser.Input.Keyboard.Key;
+
   private hero!: Hero;
   private map!: Phaser.Tilemaps.Tilemap;
   private spikeGroup!: Phaser.Physics.Arcade.Group;
   private spawnPos = { x: 0, y: 0 };
+
+  private groundCollider?: Phaser.Physics.Arcade.Collider;
+  private spikesCollider?: Phaser.Physics.Arcade.Collider;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -55,6 +60,9 @@ class Game extends Phaser.Scene {
 
   create(data) {
     this.cursorKeys = this.input.keyboard.createCursorKeys();
+    this.restartKey = this.input.keyboard.addKey(
+      Phaser.Input.Keyboard.KeyCodes.R
+    );
 
     this.anims.create({
       key: 'hero/idle',
@@ -99,10 +107,24 @@ class Game extends Phaser.Scene {
 
     this.addMap();
 
+    this.restartHero();
+  }
+
+  private restartHero() {
+    this.groundCollider?.destroy();
+    this.groundCollider = undefined;
+
+    this.spikesCollider?.destroy();
+    this.spikesCollider = undefined;
+
+    if (this.hero) {
+      this.hero.destroy();
+    }
+
     this.addHero();
   }
 
-  addHero() {
+  private addHero() {
     this.hero = new Hero(this, this.spawnPos.x, this.spawnPos.y, this.cursorKeys);
 
     this.cameras.main.setBounds(
@@ -117,12 +139,13 @@ class Game extends Phaser.Scene {
       this.hero,
       this.children.getIndex(this.map.getLayer('Foreground').tilemapLayer)
     );
-    const groundCollider = this.physics.add.collider(
+
+    this.groundCollider = this.physics.add.collider(
       this.hero,
       this.map.getLayer('Ground').tilemapLayer
     );
 
-    const spikesCollider = this.physics.add.overlap(
+    this.spikesCollider = this.physics.add.overlap(
       this.hero,
       this.spikeGroup,
       () => {
@@ -131,13 +154,17 @@ class Game extends Phaser.Scene {
     );
 
     this.hero.on('died', () => {
-      groundCollider.destroy();
-      spikesCollider.destroy();
+      this.groundCollider?.destroy();
+      this.groundCollider = undefined;
+
+      this.spikesCollider?.destroy();
+      this.spikesCollider = undefined;
+
       this.hero.body.setCollideWorldBounds(false);
     });
   }
 
-  addMap() {
+  private addMap() {
     this.map = this.make.tilemap({ key: 'level-1' });
     const groundTiles = this.map.addTilesetImage('world-1', 'world-1-sheet');
     const backgroundTiles = this.map.addTilesetImage('clouds', 'clouds-sheet');
@@ -189,9 +216,14 @@ class Game extends Phaser.Scene {
       0,
       this.cameras.main.height
     ).y;
+
+    if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
+      this.restartHero();
+      return;
+    }
+
     if (this.hero.isDead() && this.hero.getBounds().top > cameraBottom + 100) {
-      this.hero.destroy();
-      this.addHero();
+      this.restartHero();
     }
   }
 }
