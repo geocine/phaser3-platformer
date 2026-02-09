@@ -10,6 +10,9 @@ class Game extends Phaser.Scene {
   private spikeGroup!: Phaser.Physics.Arcade.Group;
   private spawnPos = { x: 0, y: 0 };
 
+  private hudText?: Phaser.GameObjects.Text;
+  private deathText?: Phaser.GameObjects.Text;
+
   private groundCollider?: Phaser.Physics.Arcade.Collider;
   private spikesCollider?: Phaser.Physics.Arcade.Collider;
 
@@ -64,6 +67,8 @@ class Game extends Phaser.Scene {
       Phaser.Input.Keyboard.KeyCodes.R
     );
 
+    this.addHud();
+
     this.anims.create({
       key: 'hero/idle',
       frames: this.anims.generateFrameNumbers('sprite/hero/idle'),
@@ -117,11 +122,37 @@ class Game extends Phaser.Scene {
     this.spikesCollider?.destroy();
     this.spikesCollider = undefined;
 
+    this.deathText?.setVisible(false);
+
     if (this.hero) {
       this.hero.destroy();
     }
 
     this.addHero();
+  }
+
+  private addHud() {
+    // Minimal controls hint (camera-fixed).
+    this.hudText = this.add
+      .text(10, 10, 'Move: ←/→  Jump: ↑  Restart: R', {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: '#ffffff'
+      })
+      .setScrollFactor(0)
+      .setDepth(1000)
+      .setAlpha(0.8);
+
+    this.deathText = this.add
+      .text(10, 30, 'You died — press R to restart', {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: '#ffdddd'
+      })
+      .setScrollFactor(0)
+      .setDepth(1000)
+      .setAlpha(0.95)
+      .setVisible(false);
   }
 
   private addHero() {
@@ -159,6 +190,8 @@ class Game extends Phaser.Scene {
 
       this.spikesCollider?.destroy();
       this.spikesCollider = undefined;
+
+      this.deathText?.setVisible(true);
 
       this.hero.body.setCollideWorldBounds(false);
     });
