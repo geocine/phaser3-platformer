@@ -14,8 +14,9 @@ class Hero extends Phaser.GameObjects.Sprite {
   } = {};
   private keys: Phaser.Types.Input.Keyboard.CursorKeys;
 
-  private readonly jumpBufferMs = 120;
+  private readonly jumpBufferMs = 200;
   private readonly coyoteTimeMs = 120;
+  private readonly flipGraceMs = 650;
 
   constructor(
     scene: Phaser.Scene,
@@ -130,12 +131,12 @@ class Hero extends Phaser.GameObjects.Sprite {
         },
         {
           name: 'flip',
-          from: 'jumping',
+          from: ['jumping', 'falling'],
           to: 'flipping'
         },
         {
           name: 'fall',
-          from: 'standing',
+          from: ['standing', 'jumping', 'flipping'],
           to: 'falling'
         },
         {
@@ -175,10 +176,20 @@ class Hero extends Phaser.GameObjects.Sprite {
         return this.body.onFloor() || withinCoyote;
       },
       flip: () => {
-        return this.controlState.didPressJump;
+        // Allow the mid-air flip while rising, or shortly after takeoff (grace window).
+        const now = this.scene.time.now;
+        const lastOnFloor = this.controlState.lastOnFloorTime ?? -Infinity;
+        const withinGrace = now - lastOnFloor <= this.flipGraceMs;
+
+        return (
+          this.controlState.didPressJump &&
+          !this.body.onFloor() &&
+          (this.body.velocity.y < 0 || withinGrace)
+        );
       },
       fall: () => {
-        return !this.body.onFloor();
+        // Transition out of jump once we start descending.
+        return !this.body.onFloor() && this.body.velocity.y > 0;
       },
       touchdown: () => {
         return this.body.onFloor();

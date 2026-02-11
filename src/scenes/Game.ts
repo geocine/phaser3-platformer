@@ -107,7 +107,9 @@ class Game extends Phaser.Scene {
     });
     this.anims.create({
       key: 'hero/dead',
-      frames: this.anims.generateFrameNumbers('sprite/hero/die')
+      frames: this.anims.generateFrameNumbers('sprite/hero/die'),
+      frameRate: 10,
+      repeat: 0
     });
 
     this.addMap();
