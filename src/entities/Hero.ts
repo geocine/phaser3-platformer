@@ -13,6 +13,7 @@ class Hero extends Phaser.GameObjects.Sprite {
     lastOnFloorTime?: number;
   } = {};
   private keys: Phaser.Types.Input.Keyboard.CursorKeys;
+  private jumpKey?: Phaser.Input.Keyboard.Key;
 
   private readonly jumpBufferMs = 200;
   private readonly coyoteTimeMs = 120;
@@ -22,7 +23,8 @@ class Hero extends Phaser.GameObjects.Sprite {
     scene: Phaser.Scene,
     x: number,
     y: number,
-    keys: Phaser.Types.Input.Keyboard.CursorKeys
+    keys: Phaser.Types.Input.Keyboard.CursorKeys,
+    jumpKey?: Phaser.Input.Keyboard.Key
   ) {
     super(scene, x, y, 'sprite/hero/run');
 
@@ -39,6 +41,7 @@ class Hero extends Phaser.GameObjects.Sprite {
     this.body.setDragX(750);
     this.controlState = {};
     this.keys = keys;
+    this.jumpKey = jumpKey;
 
     this.setupAnimation();
     this.setupMovement();
@@ -216,7 +219,11 @@ class Hero extends Phaser.GameObjects.Sprite {
       this.controlState.lastOnFloorTime = this.scene.time.now;
     }
 
-    if (!this.isDead() && Phaser.Input.Keyboard.JustDown(this.keys.up)) {
+    const didJustPressJump =
+      Phaser.Input.Keyboard.JustDown(this.keys.up) ||
+      (this.jumpKey ? Phaser.Input.Keyboard.JustDown(this.jumpKey) : false);
+
+    if (!this.isDead() && didJustPressJump) {
       this.controlState.jumpBufferedUntil =
         this.scene.time.now + this.jumpBufferMs;
     }
@@ -238,7 +245,10 @@ class Hero extends Phaser.GameObjects.Sprite {
     }
 
     if (this.moveState.is('jumping') || this.moveState.is('flipping')) {
-      if (!this.keys.up.isDown && this.body.velocity.y < -150) {
+      const jumpIsDown =
+        this.keys.up.isDown || (this.jumpKey ? this.jumpKey.isDown : false);
+
+      if (!jumpIsDown && this.body.velocity.y < -150) {
         this.body.setVelocityY(-150);
       }
     }
