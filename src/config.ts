@@ -20,8 +20,9 @@ export default {
         y: 750
       },
       debug: false,
-      debugShowVelocity: true,
-      debugShowBody: true
+      // These only take effect when `debug: true`.
+      debugShowVelocity: false,
+      debugShowBody: false
     }
   }
 };
