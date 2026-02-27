@@ -265,6 +265,15 @@ class Game extends Phaser.Scene {
       return;
     }
 
+    // If the player falls out of the level bounds, reset immediately.
+    if (
+      !this.hero.isDead() &&
+      this.hero.getBounds().top > this.map.heightInPixels + 200
+    ) {
+      this.restartHero();
+      return;
+    }
+
     if (this.hero.isDead() && this.hero.getBounds().top > cameraBottom + 100) {
       this.restartHero();
     }
