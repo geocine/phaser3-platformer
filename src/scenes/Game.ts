@@ -138,7 +138,7 @@ class Game extends Phaser.Scene {
   private addHud() {
     // Minimal controls hint (camera-fixed).
     this.hudText = this.add
-      .text(10, 10, 'Move: ←/→  Jump: ↑/Space  Restart: R', {
+      .text(10, 10, 'Move: ←/→  Jump: ↑/Space  Restart: R (Space when dead)', {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#ffffff'
@@ -148,7 +148,7 @@ class Game extends Phaser.Scene {
       .setAlpha(0.8);
 
     this.deathText = this.add
-      .text(10, 30, 'You died — press R to restart', {
+      .text(10, 30, 'You died — press R or Space to restart', {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#ffdddd'
@@ -261,6 +261,12 @@ class Game extends Phaser.Scene {
     ).y;
 
     if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
+      this.restartHero();
+      return;
+    }
+
+    // Convenience: once dead, allow Space to restart without reaching for "R".
+    if (this.hero.isDead() && Phaser.Input.Keyboard.JustDown(this.jumpKey)) {
       this.restartHero();
       return;
     }
