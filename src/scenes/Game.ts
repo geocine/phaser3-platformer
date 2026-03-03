@@ -12,6 +12,15 @@ class Game extends Phaser.Scene {
   private spikeGroup!: Phaser.Physics.Arcade.Group;
   private spawnPos = { x: 0, y: 0 };
 
+  private currentLevelKey: 'level-1' | 'level-2' = 'level-1';
+  private hasKey = false;
+
+  private keyPos?: { x: number; y: number };
+  private exitPos?: { x: number; y: number };
+
+  private keyPickup?: Phaser.GameObjects.Sprite;
+  private exitZone?: Phaser.GameObjects.Zone;
+
   private hudText?: Phaser.GameObjects.Text;
   private deathText?: Phaser.GameObjects.Text;
 
@@ -24,6 +33,7 @@ class Game extends Phaser.Scene {
 
   preload() {
     this.load.tilemapTiledJSON('level-1', 'assets/tilemaps/level-1.json');
+    this.load.tilemapTiledJSON('level-2', 'assets/tilemaps/level-2.json');
 
     this.load.spritesheet('world-1-sheet', 'assets/tilesets/world-1.png', {
       frameWidth: 32,
@@ -64,6 +74,10 @@ class Game extends Phaser.Scene {
   }
 
   create(data) {
+    // level selection (defaults to level-1)
+    this.currentLevelKey = (data?.levelKey as any) || 'level-1';
+    this.hasKey = false;
+
     this.cursorKeys = this.input.keyboard.createCursorKeys();
     this.jumpKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.restartKey = this.input.keyboard.addKey(
@@ -136,6 +150,13 @@ class Game extends Phaser.Scene {
       this.hero.destroy();
     }
 
+    // reset transient objects
+    this.keyPickup?.destroy();
+    this.keyPickup = undefined;
+
+    this.exitZone?.destroy();
+    this.exitZone = undefined;
+
     this.addHero();
   }
 
@@ -152,7 +173,7 @@ class Game extends Phaser.Scene {
       .setAlpha(0.8);
 
     this.deathText = this.add
-      .text(10, 30, 'You died — press R to restart', {
+      .text(10, 30, 'You died — press R or Space to restart', {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#ffdddd'
@@ -199,6 +220,8 @@ class Game extends Phaser.Scene {
       }
     );
 
+    this.setupLevelGoals();
+
     this.hero.on('died', () => {
       this.groundCollider?.destroy();
       this.groundCollider = undefined;
@@ -213,7 +236,10 @@ class Game extends Phaser.Scene {
   }
 
   private addMap() {
-    this.map = this.make.tilemap({ key: 'level-1' });
+    this.keyPos = undefined;
+    this.exitPos = undefined;
+
+    this.map = this.make.tilemap({ key: this.currentLevelKey });
     const groundTiles = this.map.addTilesetImage('world-1', 'world-1-sheet');
     const backgroundTiles = this.map.addTilesetImage('clouds', 'clouds-sheet');
 
@@ -240,6 +266,15 @@ class Game extends Phaser.Scene {
       if (obj.name === 'Start') {
         this.spawnPos = { x: obj.x, y: obj.y };
       }
+
+      if (obj.name === 'Key') {
+        this.keyPos = { x: obj.x, y: obj.y };
+      }
+
+      if (obj.name === 'Exit') {
+        this.exitPos = { x: obj.x, y: obj.y };
+      }
+
       // Spike
       if (obj.gid === 7) {
         const spike = this.spikeGroup.create(
@@ -257,6 +292,54 @@ class Game extends Phaser.Scene {
     this.map.createLayer('Foreground', groundTiles);
     // const debugGraphics = this.add.graphics();
     // groundLayer.renderDebug(debugGraphics);
+  }
+
+  private setupLevelGoals() {
+    // Key pickup (optional per level)
+    if (this.keyPos && !this.hasKey) {
+      this.keyPickup = this.add
+        .sprite(this.keyPos.x, this.keyPos.y, 'world-1-sheet', 1)
+        .setOrigin(0.5, 1)
+        .setScale(0.9)
+        .setDepth(10);
+
+      this.physics.add.existing(this.keyPickup, true);
+      this.physics.add.overlap(this.hero, this.keyPickup, () => {
+        if (this.hasKey) return;
+        this.hasKey = true;
+
+        this.keyPickup?.destroy();
+        this.keyPickup = undefined;
+
+        this.cameras.main.flash(120, 255, 255, 200);
+      });
+    }
+
+    // Exit (optional per level)
+    if (this.exitPos) {
+      this.exitZone = this.add
+        .zone(this.exitPos.x, this.exitPos.y, 32, 64)
+        .setOrigin(0.5, 1);
+
+      this.physics.add.existing(this.exitZone, true);
+      this.physics.add.overlap(this.hero, this.exitZone, () => {
+        if (!this.hasKey && this.keyPos) {
+          // Only lock if the level actually has a key.
+          this.cameras.main.shake(80, 0.004);
+          return;
+        }
+
+        this.goToNextLevel();
+      });
+    }
+  }
+
+  private goToNextLevel() {
+    // Simple progression for now.
+    const next: 'level-1' | 'level-2' =
+      this.currentLevelKey === 'level-1' ? 'level-2' : 'level-1';
+
+    this.scene.start('GameScene', { levelKey: next });
   }
 
   update(time, delta) {
