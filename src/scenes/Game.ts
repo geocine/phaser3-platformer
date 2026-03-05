@@ -20,7 +20,7 @@ class Game extends Phaser.Scene {
 
   private keyMarker?: Phaser.GameObjects.Container;
   private keyZone?: Phaser.GameObjects.Zone;
-  private exitDoor?: Phaser.GameObjects.Image;
+  private exitDoor?: Phaser.GameObjects.Container;
   private exitZone?: Phaser.GameObjects.Zone;
 
   private hudText?: Phaser.GameObjects.Text;
@@ -363,13 +363,27 @@ class Game extends Phaser.Scene {
     // Exit (optional per level)
     if (this.exitPos) {
       // Visible door marker so players know where to go.
+      // Use basic shapes/text to avoid any asset-loading issues.
+      const doorRect = this.add
+        .rectangle(0, -32, 28, 60, 0x5c3a16, 1)
+        .setStrokeStyle(3, 0x1b1208, 1);
+
+      const doorLabel = this.add
+        .text(0, -80, 'EXIT', {
+          fontFamily: 'monospace',
+          fontSize: '14px',
+          color: '#ffffff',
+          stroke: '#000000',
+          strokeThickness: 3
+        })
+        .setOrigin(0.5, 1);
+
       this.exitDoor = this.add
-        .image(this.exitPos.x, this.exitPos.y, 'goal/door')
-        .setOrigin(0.5, 1)
+        .container(this.exitPos.x, this.exitPos.y, [doorRect, doorLabel])
         .setDepth(1500);
 
       this.exitZone = this.add
-        .zone(this.exitPos.x, this.exitPos.y, 32, 64)
+        .zone(this.exitPos.x, this.exitPos.y, 64, 96)
         .setOrigin(0.5, 1);
 
       this.physics.add.existing(this.exitZone, true);
