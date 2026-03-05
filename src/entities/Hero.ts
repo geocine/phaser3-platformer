@@ -14,6 +14,7 @@ class Hero extends Phaser.GameObjects.Sprite {
   } = {};
   private keys: Phaser.Types.Input.Keyboard.CursorKeys;
   private jumpKey?: Phaser.Input.Keyboard.Key;
+  private sprintKey?: Phaser.Input.Keyboard.Key;
 
   private readonly jumpBufferMs = 200;
   private readonly coyoteTimeMs = 120;
@@ -24,7 +25,8 @@ class Hero extends Phaser.GameObjects.Sprite {
     x: number,
     y: number,
     keys: Phaser.Types.Input.Keyboard.CursorKeys,
-    jumpKey?: Phaser.Input.Keyboard.Key
+    jumpKey?: Phaser.Input.Keyboard.Key,
+    sprintKey?: Phaser.Input.Keyboard.Key
   ) {
     super(scene, x, y, 'sprite/hero/run');
 
@@ -42,6 +44,7 @@ class Hero extends Phaser.GameObjects.Sprite {
     this.controlState = {};
     this.keys = keys;
     this.jumpKey = jumpKey;
+    this.sprintKey = sprintKey;
 
     this.setupAnimation();
     this.setupMovement();
@@ -232,12 +235,19 @@ class Hero extends Phaser.GameObjects.Sprite {
       !this.isDead() &&
       (this.controlState.jumpBufferedUntil ?? 0) > this.scene.time.now;
 
+    const isSprinting =
+      !this.isDead() && (this.sprintKey ? this.sprintKey.isDown : false);
+
+    // Sprinting is intentionally subtle: slightly higher top-speed + acceleration.
+    this.body.setMaxVelocity(isSprinting ? 340 : 250, 400);
+    const accelX = isSprinting ? 1500 : 1000;
+
     if (!this.isDead() && this.keys.left.isDown) {
-      this.body.setAccelerationX(-1000);
+      this.body.setAccelerationX(-accelX);
       this.setFlipX(true);
       this.body.offset.x = 8;
     } else if (!this.isDead() && this.keys.right.isDown) {
-      this.body.setAccelerationX(1000);
+      this.body.setAccelerationX(accelX);
       this.setFlipX(false);
       this.body.offset.x = 12;
     } else {

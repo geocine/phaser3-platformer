@@ -5,6 +5,7 @@ class Game extends Phaser.Scene {
   private cursorKeys!: Phaser.Types.Input.Keyboard.CursorKeys;
   private jumpKey!: Phaser.Input.Keyboard.Key;
   private restartKey!: Phaser.Input.Keyboard.Key;
+  private sprintKey!: Phaser.Input.Keyboard.Key;
 
   private hero!: Hero;
   private map!: Phaser.Tilemaps.Tilemap;
@@ -67,6 +68,9 @@ class Game extends Phaser.Scene {
     this.jumpKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.restartKey = this.input.keyboard.addKey(
       Phaser.Input.Keyboard.KeyCodes.R
+    );
+    this.sprintKey = this.input.keyboard.addKey(
+      Phaser.Input.Keyboard.KeyCodes.SHIFT
     );
 
     this.addHud();
@@ -138,7 +142,7 @@ class Game extends Phaser.Scene {
   private addHud() {
     // Minimal controls hint (camera-fixed).
     this.hudText = this.add
-      .text(10, 10, 'Move: ←/→  Jump: ↑/Space  Restart: R', {
+      .text(10, 10, 'Move: ←/→  Jump: ↑/Space  Sprint: Shift  Restart: R', {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#ffffff'
@@ -165,7 +169,8 @@ class Game extends Phaser.Scene {
       this.spawnPos.x,
       this.spawnPos.y,
       this.cursorKeys,
-      this.jumpKey
+      this.jumpKey,
+      this.sprintKey
     );
 
     this.cameras.main.setBounds(
