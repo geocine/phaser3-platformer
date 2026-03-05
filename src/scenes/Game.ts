@@ -20,6 +20,7 @@ class Game extends Phaser.Scene {
 
   private keyMarker?: Phaser.GameObjects.Container;
   private keyZone?: Phaser.GameObjects.Zone;
+  private exitDoor?: Phaser.GameObjects.Image;
   private exitZone?: Phaser.GameObjects.Zone;
 
   private hudText?: Phaser.GameObjects.Text;
@@ -35,6 +36,12 @@ class Game extends Phaser.Scene {
   preload() {
     this.load.tilemapTiledJSON('level-1', 'assets/tilemaps/level-1.json');
     this.load.tilemapTiledJSON('level-2', 'assets/tilemaps/level-2.json');
+
+    // Simple door marker for the Exit goal.
+    this.load.image(
+      'goal/door',
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDMyIDY0Ij4KICA8cmVjdCB4PSI2IiB5PSIxMiIgd2lkdGg9IjIwIiBoZWlnaHQ9IjQ2IiByeD0iNCIgZmlsbD0iIzdhNGUyMiIgc3Ryb2tlPSIjMmExYTBjIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8cmVjdCB4PSI5IiB5PSIxNSIgd2lkdGg9IjE0IiBoZWlnaHQ9IjQwIiByeD0iMyIgZmlsbD0iIzVmM2ExNiIgc3Ryb2tlPSIjNGEyYzEwIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8Y2lyY2xlIGN4PSIyMiIgY3k9IjM4IiByPSIyIiBmaWxsPSIjZmZkMjRkIi8+CiAgPHJlY3QgeD0iMjEiIHk9IjQ3IiB3aWR0aD0iMiIgaGVpZ2h0PSI1IiBmaWxsPSIjMmExYTBjIi8+CiAgPHBhdGggZD0iTTIwIDQ2YTIgMiAwIDAgMSA0IDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJhMWEwYyIgc3Ryb2tlLXdpZHRoPSIxIi8+Cjwvc3ZnPgo='
+    );
 
     this.load.spritesheet('world-1-sheet', 'assets/tilesets/world-1.png', {
       frameWidth: 32,
@@ -157,6 +164,9 @@ class Game extends Phaser.Scene {
 
     this.keyZone?.destroy();
     this.keyZone = undefined;
+
+    this.exitDoor?.destroy();
+    this.exitDoor = undefined;
 
     this.exitZone?.destroy();
     this.exitZone = undefined;
@@ -352,6 +362,12 @@ class Game extends Phaser.Scene {
 
     // Exit (optional per level)
     if (this.exitPos) {
+      // Visible door marker so players know where to go.
+      this.exitDoor = this.add
+        .image(this.exitPos.x, this.exitPos.y, 'goal/door')
+        .setOrigin(0.5, 1)
+        .setDepth(1500);
+
       this.exitZone = this.add
         .zone(this.exitPos.x, this.exitPos.y, 32, 64)
         .setOrigin(0.5, 1);
