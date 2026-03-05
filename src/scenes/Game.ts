@@ -25,6 +25,8 @@ class Game extends Phaser.Scene {
 
   private hudText?: Phaser.GameObjects.Text;
   private deathText?: Phaser.GameObjects.Text;
+  private debugText?: Phaser.GameObjects.Text;
+  private debugGraphics?: Phaser.GameObjects.Graphics;
 
   private groundCollider?: Phaser.Physics.Arcade.Collider;
   private spikesCollider?: Phaser.Physics.Arcade.Collider;
@@ -171,6 +173,8 @@ class Game extends Phaser.Scene {
     this.exitZone?.destroy();
     this.exitZone = undefined;
 
+    this.debugGraphics?.clear();
+
     this.addHero();
   }
 
@@ -196,6 +200,19 @@ class Game extends Phaser.Scene {
       .setDepth(1000)
       .setAlpha(0.95)
       .setVisible(false);
+
+    // Temporary debug overlay so we can *prove* where Exit/Key are.
+    this.debugText = this.add
+      .text(10, 50, '', {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#aaffaa'
+      })
+      .setScrollFactor(0)
+      .setDepth(2000)
+      .setAlpha(0.9);
+
+    this.debugGraphics = this.add.graphics().setDepth(1999);
   }
 
   private addHero() {
@@ -358,6 +375,15 @@ class Game extends Phaser.Scene {
 
         this.cameras.main.flash(120, 255, 255, 200);
       });
+
+      // Debug draw the key pickup zone bounds.
+      this.debugGraphics?.lineStyle(2, 0xffff00, 1);
+      this.debugGraphics?.strokeRect(
+        this.keyPos.x - 20,
+        (this.keyPos.y - 24) - 72,
+        40,
+        72
+      );
     }
 
     // Exit (optional per level)
@@ -396,6 +422,15 @@ class Game extends Phaser.Scene {
 
         this.goToNextLevel();
       });
+
+      // Debug draw the exit zone bounds.
+      this.debugGraphics?.lineStyle(2, 0x00ff00, 1);
+      this.debugGraphics?.strokeRect(
+        this.exitPos.x - 32,
+        this.exitPos.y - 96,
+        64,
+        96
+      );
     }
   }
 
@@ -412,6 +447,15 @@ class Game extends Phaser.Scene {
       0,
       this.cameras.main.height
     ).y;
+
+    // Debug overlay (camera-fixed)
+    this.debugText?.setText(
+      [
+        `level=${this.currentLevelKey} hasKey=${this.hasKey}`,
+        `keyPos=${this.keyPos ? `${Math.round(this.keyPos.x)},${Math.round(this.keyPos.y)}` : 'none'}`,
+        `exitPos=${this.exitPos ? `${Math.round(this.exitPos.x)},${Math.round(this.exitPos.y)}` : 'none'}`
+      ].join('\n')
+    );
 
     if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
       this.restartHero();
