@@ -18,7 +18,8 @@ class Game extends Phaser.Scene {
   private keyPos?: { x: number; y: number };
   private exitPos?: { x: number; y: number };
 
-  private keyPickup?: Phaser.GameObjects.Sprite;
+  private keyMarker?: Phaser.GameObjects.Container;
+  private keyZone?: Phaser.GameObjects.Zone;
   private exitZone?: Phaser.GameObjects.Zone;
 
   private hudText?: Phaser.GameObjects.Text;
@@ -151,8 +152,11 @@ class Game extends Phaser.Scene {
     }
 
     // reset transient objects
-    this.keyPickup?.destroy();
-    this.keyPickup = undefined;
+    this.keyMarker?.destroy();
+    this.keyMarker = undefined;
+
+    this.keyZone?.destroy();
+    this.keyZone = undefined;
 
     this.exitZone?.destroy();
     this.exitZone = undefined;
@@ -297,19 +301,50 @@ class Game extends Phaser.Scene {
   private setupLevelGoals() {
     // Key pickup (optional per level)
     if (this.keyPos && !this.hasKey) {
-      this.keyPickup = this.add
-        .sprite(this.keyPos.x, this.keyPos.y, 'world-1-sheet', 1)
+      // Make the key extremely visible: bright tint + label + bobbing.
+      const icon = this.add
+        .sprite(0, 0, 'world-1-sheet', 1)
         .setOrigin(0.5, 1)
-        .setScale(0.9)
-        .setDepth(10);
+        .setTint(0xffd400)
+        .setScale(1.1);
 
-      this.physics.add.existing(this.keyPickup, true);
-      this.physics.add.overlap(this.hero, this.keyPickup, () => {
+      const label = this.add
+        .text(0, -48, 'KEY', {
+          fontFamily: 'monospace',
+          fontSize: '14px',
+          color: '#ffea7a',
+          stroke: '#000000',
+          strokeThickness: 3
+        })
+        .setOrigin(0.5, 1);
+
+      this.keyMarker = this.add
+        .container(this.keyPos.x, this.keyPos.y, [icon, label])
+        .setDepth(2000);
+
+      this.tweens.add({
+        targets: this.keyMarker,
+        y: this.keyPos.y - 8,
+        duration: 600,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.inOut'
+      });
+
+      this.keyZone = this.add
+        .zone(this.keyPos.x, this.keyPos.y - 24, 40, 72)
+        .setOrigin(0.5, 1);
+      this.physics.add.existing(this.keyZone, true);
+
+      this.physics.add.overlap(this.hero, this.keyZone, () => {
         if (this.hasKey) return;
         this.hasKey = true;
 
-        this.keyPickup?.destroy();
-        this.keyPickup = undefined;
+        this.keyMarker?.destroy();
+        this.keyMarker = undefined;
+
+        this.keyZone?.destroy();
+        this.keyZone = undefined;
 
         this.cameras.main.flash(120, 255, 255, 200);
       });
