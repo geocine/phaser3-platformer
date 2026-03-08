@@ -1,6 +1,22 @@
 import Phaser from 'phaser';
 import Hero from '../entities/Hero';
 
+const level1TilemapUrl = new URL('../../assets/tilemaps/level-1.json', import.meta.url).href;
+const level2TilemapUrl = new URL('../../assets/tilemaps/level-2.json', import.meta.url).href;
+const keySpriteUrl = new URL('../../assets/key.png', import.meta.url).href;
+const exitDoorSpriteUrl = new URL('../../assets/exit-door.png', import.meta.url).href;
+const SHOW_LEVEL_DEBUG = false;
+const levelGoalFallbacks = {
+  'level-1': {
+    exit: { x: 880, y: 416 },
+    key: { x: 720, y: 416 }
+  },
+  'level-2': {
+    exit: { x: 1952, y: 385 },
+    key: { x: 1408, y: 256 }
+  }
+} as const;
+
 class Game extends Phaser.Scene {
   private cursorKeys!: Phaser.Types.Input.Keyboard.CursorKeys;
   private jumpKey!: Phaser.Input.Keyboard.Key;
@@ -22,11 +38,17 @@ class Game extends Phaser.Scene {
   private keyZone?: Phaser.GameObjects.Zone;
   private exitDoor?: Phaser.GameObjects.Container;
   private exitZone?: Phaser.GameObjects.Zone;
+  private exitParticles?: Phaser.GameObjects.Particles.ParticleEmitter;
+  private exitGlowFx?: Phaser.FX.Glow;
+  private exitAuraOuter?: Phaser.GameObjects.Image;
+  private exitAuraInner?: Phaser.GameObjects.Image;
+  private exitFloorGlow?: Phaser.GameObjects.Image;
 
   private hudText?: Phaser.GameObjects.Text;
   private deathText?: Phaser.GameObjects.Text;
   private debugText?: Phaser.GameObjects.Text;
   private debugGraphics?: Phaser.GameObjects.Graphics;
+  private goalFallbacksUsed: string[] = [];
 
   private groundCollider?: Phaser.Physics.Arcade.Collider;
   private spikesCollider?: Phaser.Physics.Arcade.Collider;
@@ -36,15 +58,12 @@ class Game extends Phaser.Scene {
   }
 
   preload() {
-    // Add a cache-busting query param so deploy previews don't serve stale tilemaps.
-    this.load.tilemapTiledJSON('level-1', 'assets/tilemaps/level-1.json?v=20260308');
-    this.load.tilemapTiledJSON('level-2', 'assets/tilemaps/level-2.json?v=20260308');
+    // Let Vite fingerprint the tilemaps so dev and build use the same authored files.
+    this.load.tilemapTiledJSON('level-1', level1TilemapUrl);
+    this.load.tilemapTiledJSON('level-2', level2TilemapUrl);
 
-    // Simple door marker for the Exit goal.
-    this.load.image(
-      'goal/door',
-      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDMyIDY0Ij4KICA8cmVjdCB4PSI2IiB5PSIxMiIgd2lkdGg9IjIwIiBoZWlnaHQ9IjQ2IiByeD0iNCIgZmlsbD0iIzdhNGUyMiIgc3Ryb2tlPSIjMmExYTBjIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8cmVjdCB4PSI5IiB5PSIxNSIgd2lkdGg9IjE0IiBoZWlnaHQ9IjQwIiByeD0iMyIgZmlsbD0iIzVmM2ExNiIgc3Ryb2tlPSIjNGEyYzEwIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8Y2lyY2xlIGN4PSIyMiIgY3k9IjM4IiByPSIyIiBmaWxsPSIjZmZkMjRkIi8+CiAgPHJlY3QgeD0iMjEiIHk9IjQ3IiB3aWR0aD0iMiIgaGVpZ2h0PSI1IiBmaWxsPSIjMmExYTBjIi8+CiAgPHBhdGggZD0iTTIwIDQ2YTIgMiAwIDAgMSA0IDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJhMWEwYyIgc3Ryb2tlLXdpZHRoPSIxIi8+Cjwvc3ZnPgo='
-    );
+    this.load.image('goal/door', exitDoorSpriteUrl);
+    this.load.image('pickup/key', keySpriteUrl);
 
     this.load.spritesheet('world-1-sheet', 'assets/tilesets/world-1.png', {
       frameWidth: 32,
@@ -99,6 +118,7 @@ class Game extends Phaser.Scene {
     );
 
     this.addHud();
+    this.ensureGoalEffectTextures();
 
     this.anims.create({
       key: 'hero/idle',
@@ -168,6 +188,33 @@ class Game extends Phaser.Scene {
     this.keyZone?.destroy();
     this.keyZone = undefined;
 
+    if (this.exitGlowFx) {
+      this.tweens.killTweensOf(this.exitGlowFx);
+      this.exitGlowFx = undefined;
+    }
+
+    if (this.exitAuraOuter) {
+      this.tweens.killTweensOf(this.exitAuraOuter);
+      this.exitAuraOuter = undefined;
+    }
+
+    if (this.exitAuraInner) {
+      this.tweens.killTweensOf(this.exitAuraInner);
+      this.exitAuraInner = undefined;
+    }
+
+    if (this.exitFloorGlow) {
+      this.tweens.killTweensOf(this.exitFloorGlow);
+      this.exitFloorGlow = undefined;
+    }
+
+    if (this.exitParticles) {
+      this.exitParticles.stop(true);
+      this.exitParticles.destroy();
+      this.exitParticles = undefined;
+    }
+
+    this.tweens.killTweensOf(this.exitDoor);
     this.exitDoor?.destroy();
     this.exitDoor = undefined;
 
@@ -175,8 +222,33 @@ class Game extends Phaser.Scene {
     this.exitZone = undefined;
 
     this.debugGraphics?.clear();
+    this.hasKey = false;
 
     this.addHero();
+  }
+
+  private ensureGoalEffectTextures() {
+    if (!this.textures.exists('goal/glow')) {
+      const glowTexture = this.make.graphics({ x: 0, y: 0, add: false });
+      glowTexture.fillStyle(0xffffff, 0.1);
+      glowTexture.fillCircle(24, 24, 22);
+      glowTexture.fillStyle(0xffffff, 0.2);
+      glowTexture.fillCircle(24, 24, 16);
+      glowTexture.fillStyle(0xffffff, 0.55);
+      glowTexture.fillCircle(24, 24, 9);
+      glowTexture.generateTexture('goal/glow', 48, 48);
+      glowTexture.destroy();
+    }
+
+    if (!this.textures.exists('goal/spark')) {
+      const sparkTexture = this.make.graphics({ x: 0, y: 0, add: false });
+      sparkTexture.fillStyle(0xffffff, 0.14);
+      sparkTexture.fillCircle(12, 12, 10);
+      sparkTexture.fillStyle(0xffffff, 0.8);
+      sparkTexture.fillCircle(12, 12, 4);
+      sparkTexture.generateTexture('goal/spark', 24, 24);
+      sparkTexture.destroy();
+    }
   }
 
   private addHud() {
@@ -202,18 +274,19 @@ class Game extends Phaser.Scene {
       .setAlpha(0.95)
       .setVisible(false);
 
-    // Temporary debug overlay so we can *prove* where Exit/Key are.
-    this.debugText = this.add
-      .text(10, 50, '', {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#aaffaa'
-      })
-      .setScrollFactor(0)
-      .setDepth(2000)
-      .setAlpha(0.9);
+    if (SHOW_LEVEL_DEBUG) {
+      this.debugText = this.add
+        .text(10, 50, '', {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#aaffaa'
+        })
+        .setScrollFactor(0)
+        .setDepth(2000)
+        .setAlpha(0.9);
 
-    this.debugGraphics = this.add.graphics().setDepth(1999);
+      this.debugGraphics = this.add.graphics().setDepth(1999);
+    }
   }
 
   private addHero() {
@@ -270,6 +343,7 @@ class Game extends Phaser.Scene {
   private addMap() {
     this.keyPos = undefined;
     this.exitPos = undefined;
+    this.goalFallbacksUsed = [];
 
     this.map = this.make.tilemap({ key: this.currentLevelKey });
     const groundTiles = this.map.addTilesetImage('world-1', 'world-1-sheet');
@@ -321,33 +395,45 @@ class Game extends Phaser.Scene {
       }
     });
 
+    const fallback = levelGoalFallbacks[this.currentLevelKey];
+
+    if (!this.exitPos) {
+      this.exitPos = { ...fallback.exit };
+      this.goalFallbacksUsed.push('exit');
+      if (SHOW_LEVEL_DEBUG) {
+        console.warn(
+          `[GameScene] Missing Exit object in ${this.currentLevelKey}; using fallback at ${fallback.exit.x},${fallback.exit.y}.`
+        );
+      }
+    }
+
+    if (!this.keyPos) {
+      this.keyPos = { ...fallback.key };
+      this.goalFallbacksUsed.push('key');
+      if (SHOW_LEVEL_DEBUG) {
+        console.warn(
+          `[GameScene] Missing Key object in ${this.currentLevelKey}; using fallback at ${fallback.key.x},${fallback.key.y}.`
+        );
+      }
+    }
+
     this.map.createLayer('Foreground', groundTiles);
     // const debugGraphics = this.add.graphics();
     // groundLayer.renderDebug(debugGraphics);
   }
 
   private setupLevelGoals() {
+    const exitStartsUnlocked = !this.keyPos || this.hasKey;
+
     // Key pickup (optional per level)
     if (this.keyPos && !this.hasKey) {
-      // Make the key extremely visible: bright tint + label + bobbing.
+      // Use the native 16x16 sprite so its pixel density matches the rest of the art.
       const icon = this.add
-        .sprite(0, 0, 'world-1-sheet', 1)
-        .setOrigin(0.5, 1)
-        .setTint(0xffd400)
-        .setScale(1.1);
-
-      const label = this.add
-        .text(0, -48, 'KEY', {
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          color: '#ffea7a',
-          stroke: '#000000',
-          strokeThickness: 3
-        })
+        .image(0, 0, 'pickup/key')
         .setOrigin(0.5, 1);
 
       this.keyMarker = this.add
-        .container(this.keyPos.x, this.keyPos.y, [icon, label])
+        .container(this.keyPos.x, this.keyPos.y, [icon])
         .setDepth(2000);
 
       this.tweens.add({
@@ -360,7 +446,7 @@ class Game extends Phaser.Scene {
       });
 
       this.keyZone = this.add
-        .zone(this.keyPos.x, this.keyPos.y - 24, 40, 72)
+        .zone(this.keyPos.x, this.keyPos.y + 2, 28, 40)
         .setOrigin(0.5, 1);
       this.physics.add.existing(this.keyZone, true);
 
@@ -374,46 +460,128 @@ class Game extends Phaser.Scene {
         this.keyZone?.destroy();
         this.keyZone = undefined;
 
+        this.setExitUnlocked(true, true);
+        this.redrawGoalDebugBounds();
         this.cameras.main.flash(120, 255, 255, 200);
       });
-
-      // Debug draw the key pickup zone bounds.
-      this.debugGraphics?.lineStyle(2, 0xffff00, 1);
-      this.debugGraphics?.strokeRect(
-        this.keyPos.x - 20,
-        (this.keyPos.y - 24) - 72,
-        40,
-        72
-      );
     }
 
     // Exit (optional per level)
     if (this.exitPos) {
-      // Visible door marker so players know where to go.
-      // Use basic shapes/text to avoid any asset-loading issues.
-      const doorRect = this.add
-        .rectangle(0, -32, 28, 60, 0x5c3a16, 1)
-        .setStrokeStyle(3, 0x1b1208, 1);
+      const floorGlow = this.add
+        .image(0, -6, 'goal/glow')
+        .setOrigin(0.5, 0.5)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(0x48ebd3)
+        .setAlpha(0.2)
+        .setScale(1.15, 0.35);
 
-      const doorLabel = this.add
-        .text(0, -80, 'EXIT', {
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          color: '#ffffff',
-          stroke: '#000000',
-          strokeThickness: 3
-        })
-        .setOrigin(0.5, 1);
+      const auraOuter = this.add
+        .image(0, -36, 'goal/glow')
+        .setOrigin(0.5, 0.5)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(0x56f0d9)
+        .setAlpha(0.28)
+        .setScale(1.65, 2.95);
+
+      const auraInner = this.add
+        .image(0, -34, 'goal/glow')
+        .setOrigin(0.5, 0.5)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(0xffe68a)
+        .setAlpha(0.18)
+        .setScale(1.15, 2.25);
+
+      const doorSprite = this.add
+        .image(0, 0, 'goal/door')
+        .setOrigin(0.5, 1)
+        .setFlipX(true);
+
+      if (this.game.renderer.type === Phaser.WEBGL && doorSprite.preFX) {
+        this.exitGlowFx = doorSprite.preFX.addGlow(0x6af6d6, 5, 0, false, 0.08, 12);
+
+        this.tweens.add({
+          targets: this.exitGlowFx,
+          outerStrength: { from: 3.5, to: 6.75 },
+          duration: 920,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.inOut'
+        });
+      }
 
       this.exitDoor = this.add
-        .container(this.exitPos.x, this.exitPos.y, [doorRect, doorLabel])
-        .setDepth(1500);
+        .container(this.exitPos.x, this.exitPos.y, [
+          floorGlow,
+          auraOuter,
+          auraInner,
+          doorSprite
+        ])
+        .setDepth(1500)
+        .setVisible(exitStartsUnlocked);
+
+      this.exitAuraOuter = auraOuter;
+      this.exitAuraInner = auraInner;
+      this.exitFloorGlow = floorGlow;
+
+      this.tweens.add({
+        targets: auraOuter,
+        alpha: { from: 0.2, to: 0.38 },
+        scaleX: { from: 1.55, to: 1.9 },
+        scaleY: { from: 2.75, to: 3.2 },
+        duration: 1100,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.inOut'
+      });
+
+      this.tweens.add({
+        targets: auraInner,
+        alpha: { from: 0.14, to: 0.28 },
+        scaleX: { from: 1.05, to: 1.25 },
+        scaleY: { from: 2.05, to: 2.4 },
+        duration: 760,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.inOut'
+      });
+
+      this.tweens.add({
+        targets: floorGlow,
+        alpha: { from: 0.14, to: 0.3 },
+        scaleX: { from: 1.05, to: 1.32 },
+        scaleY: { from: 0.28, to: 0.38 },
+        duration: 920,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.inOut'
+      });
+
+      this.exitParticles = this.add
+        .particles(this.exitPos.x, this.exitPos.y, 'goal/spark', {
+          x: { min: -14, max: 14 },
+          y: { min: -58, max: -10 },
+          speedX: { min: -10, max: 10 },
+          speedY: { min: -34, max: -8 },
+          scale: { start: 0.22, end: 0 },
+          alpha: { start: 0.85, end: 0 },
+          lifespan: { min: 650, max: 1350 },
+          frequency: 90,
+          quantity: 2,
+          gravityY: -6,
+          tint: [0x59f2d7, 0xffeb93, 0xffffff],
+          blendMode: Phaser.BlendModes.ADD,
+          emitting: false
+        })
+        .setDepth(1490)
+        .setVisible(false);
 
       this.exitZone = this.add
         .zone(this.exitPos.x, this.exitPos.y, 64, 96)
         .setOrigin(0.5, 1);
 
       this.physics.add.existing(this.exitZone, true);
+
       this.physics.add.overlap(this.hero, this.exitZone, () => {
         if (!this.hasKey && this.keyPos) {
           // Only lock if the level actually has a key.
@@ -424,7 +592,73 @@ class Game extends Phaser.Scene {
         this.goToNextLevel();
       });
 
-      // Debug draw the exit zone bounds.
+      this.setExitUnlocked(exitStartsUnlocked);
+    }
+
+    this.redrawGoalDebugBounds();
+  }
+
+  private setExitUnlocked(isUnlocked: boolean, burst = false) {
+    if (this.exitDoor) {
+      this.exitDoor.setVisible(isUnlocked);
+      this.exitDoor.setAlpha(isUnlocked ? 1 : 0);
+
+      if (isUnlocked && burst) {
+        this.exitDoor.setScale(0.92);
+        this.tweens.add({
+          targets: this.exitDoor,
+          alpha: { from: 0.45, to: 1 },
+          scaleX: { from: 0.92, to: 1 },
+          scaleY: { from: 0.92, to: 1 },
+          duration: 220,
+          ease: 'Quad.out'
+        });
+      } else {
+        this.exitDoor.setScale(1);
+      }
+    }
+
+    const exitBody = this.exitZone?.body as
+      | Phaser.Physics.Arcade.StaticBody
+      | undefined;
+
+    if (exitBody) {
+      exitBody.enable = isUnlocked;
+    }
+
+    if (this.exitParticles) {
+      this.exitParticles.setVisible(isUnlocked);
+
+      if (isUnlocked) {
+        this.exitParticles.start();
+
+        if (burst) {
+          this.exitParticles.emitParticle(24);
+        }
+      } else {
+        this.exitParticles.stop(true);
+      }
+    }
+  }
+
+  private redrawGoalDebugBounds() {
+    if (!SHOW_LEVEL_DEBUG) {
+      return;
+    }
+
+    this.debugGraphics?.clear();
+
+    if (this.keyPos && !this.hasKey) {
+      this.debugGraphics?.lineStyle(2, 0xffff00, 1);
+      this.debugGraphics?.strokeRect(
+        this.keyPos.x - 14,
+        (this.keyPos.y + 2) - 40,
+        28,
+        40
+      );
+    }
+
+    if (this.exitPos && (!this.keyPos || this.hasKey)) {
       this.debugGraphics?.lineStyle(2, 0x00ff00, 1);
       this.debugGraphics?.strokeRect(
         this.exitPos.x - 32,
@@ -449,15 +683,17 @@ class Game extends Phaser.Scene {
       this.cameras.main.height
     ).y;
 
-    // Debug overlay (camera-fixed)
-    this.debugText?.setText(
-      [
-        `level=${this.currentLevelKey} hasKey=${this.hasKey}`,
-        `keyPos=${this.keyPos ? `${Math.round(this.keyPos.x)},${Math.round(this.keyPos.y)}` : 'none'}`,
-        `exitPos=${this.exitPos ? `${Math.round(this.exitPos.x)},${Math.round(this.exitPos.y)}` : 'none'}`,
-        `mapPx=${this.map?.widthInPixels}x${this.map?.heightInPixels}`
-      ].join('\n')
-    );
+    if (SHOW_LEVEL_DEBUG) {
+      this.debugText?.setText(
+        [
+          `level=${this.currentLevelKey} hasKey=${this.hasKey}`,
+          `keyPos=${this.keyPos ? `${Math.round(this.keyPos.x)},${Math.round(this.keyPos.y)}` : 'none'}`,
+          `exitPos=${this.exitPos ? `${Math.round(this.exitPos.x)},${Math.round(this.exitPos.y)}` : 'none'}`,
+          `fallbacks=${this.goalFallbacksUsed.length ? this.goalFallbacksUsed.join(',') : 'none'}`,
+          `mapPx=${this.map?.widthInPixels}x${this.map?.heightInPixels}`
+        ].join('\n')
+      );
+    }
 
     if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
       this.restartHero();
