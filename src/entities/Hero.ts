@@ -19,6 +19,10 @@ class Hero extends Phaser.GameObjects.Sprite {
   private readonly jumpBufferMs = 200;
   private readonly coyoteTimeMs = 120;
   private readonly flipGraceMs = 650;
+  private readonly normalJumpVelocity = 400;
+  private readonly sprintJumpVelocity = 460;
+  private readonly flipJumpVelocity = 300;
+  private readonly maxFallVelocity = 520;
 
   constructor(
     scene: Phaser.Scene,
@@ -39,7 +43,7 @@ class Hero extends Phaser.GameObjects.Sprite {
     this.body.setCollideWorldBounds(true);
     this.body.setSize(12, 40);
     this.body.setOffset(12, 23);
-    this.body.setMaxVelocity(250, 400);
+    this.body.setMaxVelocity(250, this.maxFallVelocity);
     this.body.setDragX(750);
     this.controlState = {};
     this.keys = keys;
@@ -158,10 +162,13 @@ class Hero extends Phaser.GameObjects.Sprite {
       ],
       methods: {
         onJump: () => {
-          this.body.setVelocityY(-400);
+          const jumpVelocity = this.isSprintJumpActive()
+            ? this.sprintJumpVelocity
+            : this.normalJumpVelocity;
+          this.body.setVelocityY(-jumpVelocity);
         },
         onFlip: () => {
-          this.body.setVelocityY(-300);
+          this.body.setVelocityY(-this.flipJumpVelocity);
         },
         onDie: () => {
           this.body.setVelocity(0, -500);
@@ -215,6 +222,10 @@ class Hero extends Phaser.GameObjects.Sprite {
     return this.moveState.is('dead');
   }
 
+  private isSprintJumpActive() {
+    return !this.isDead() && (this.sprintKey ? this.sprintKey.isDown : false);
+  }
+
   preUpdate(time: number, delta: number) {
     super.preUpdate(time, delta);
 
@@ -235,11 +246,10 @@ class Hero extends Phaser.GameObjects.Sprite {
       !this.isDead() &&
       (this.controlState.jumpBufferedUntil ?? 0) > this.scene.time.now;
 
-    const isSprinting =
-      !this.isDead() && (this.sprintKey ? this.sprintKey.isDown : false);
+    const isSprinting = this.isSprintJumpActive();
 
     // Sprinting is intentionally subtle: slightly higher top-speed + acceleration.
-    this.body.setMaxVelocity(isSprinting ? 340 : 250, 400);
+    this.body.setMaxVelocity(isSprinting ? 340 : 250, this.maxFallVelocity);
     const accelX = isSprinting ? 1500 : 1000;
 
     if (!this.isDead() && this.keys.left.isDown) {
