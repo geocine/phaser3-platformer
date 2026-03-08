@@ -36,8 +36,9 @@ class Game extends Phaser.Scene {
   }
 
   preload() {
-    this.load.tilemapTiledJSON('level-1', 'assets/tilemaps/level-1.json');
-    this.load.tilemapTiledJSON('level-2', 'assets/tilemaps/level-2.json');
+    // Add a cache-busting query param so deploy previews don't serve stale tilemaps.
+    this.load.tilemapTiledJSON('level-1', 'assets/tilemaps/level-1.json?v=20260308');
+    this.load.tilemapTiledJSON('level-2', 'assets/tilemaps/level-2.json?v=20260308');
 
     // Simple door marker for the Exit goal.
     this.load.image(
@@ -453,7 +454,8 @@ class Game extends Phaser.Scene {
       [
         `level=${this.currentLevelKey} hasKey=${this.hasKey}`,
         `keyPos=${this.keyPos ? `${Math.round(this.keyPos.x)},${Math.round(this.keyPos.y)}` : 'none'}`,
-        `exitPos=${this.exitPos ? `${Math.round(this.exitPos.x)},${Math.round(this.exitPos.y)}` : 'none'}`
+        `exitPos=${this.exitPos ? `${Math.round(this.exitPos.x)},${Math.round(this.exitPos.y)}` : 'none'}`,
+        `mapPx=${this.map?.widthInPixels}x${this.map?.heightInPixels}`
       ].join('\n')
     );
 
