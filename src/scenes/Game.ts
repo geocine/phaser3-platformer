@@ -22,6 +22,7 @@ class Game extends Phaser.Scene {
   private jumpKey!: Phaser.Input.Keyboard.Key;
   private restartKey!: Phaser.Input.Keyboard.Key;
   private sprintKey!: Phaser.Input.Keyboard.Key;
+  private debugToggleKey!: Phaser.Input.Keyboard.Key;
 
   private hero!: Hero;
   private map!: Phaser.Tilemaps.Tilemap;
@@ -52,6 +53,8 @@ class Game extends Phaser.Scene {
 
   private groundCollider?: Phaser.Physics.Arcade.Collider;
   private spikesCollider?: Phaser.Physics.Arcade.Collider;
+
+  private showLevelDebug = SHOW_LEVEL_DEBUG;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -116,6 +119,11 @@ class Game extends Phaser.Scene {
     this.sprintKey = this.input.keyboard.addKey(
       Phaser.Input.Keyboard.KeyCodes.SHIFT
     );
+    this.debugToggleKey = this.input.keyboard.addKey(
+      Phaser.Input.Keyboard.KeyCodes.F3
+    );
+
+    this.showLevelDebug = SHOW_LEVEL_DEBUG || this.readInitialDebugFlag();
 
     this.addHud();
     this.ensureGoalEffectTextures();
@@ -147,7 +155,7 @@ class Game extends Phaser.Scene {
     this.anims.create({
       key: 'hero/flipping',
       frames: this.anims.generateFrameNumbers('sprite/hero/flip'),
-      frameRate: 30,
+      frameRate:  30,
       repeat: 0
     });
     this.anims.create({
@@ -166,6 +174,49 @@ class Game extends Phaser.Scene {
     this.addMap();
 
     this.restartHero();
+  }
+
+  private readInitialDebugFlag() {
+    try {
+      if (typeof window === 'undefined') {
+        return false;
+      }
+
+      return new URLSearchParams(window.location.search).has('debug');
+    } catch {
+      return false;
+    }
+  }
+
+  private setDebugMode(enabled: boolean) {
+    this.showLevelDebug = enabled;
+
+    if (!enabled) {
+      this.debugText?.destroy();
+      this.debugText = undefined;
+
+      this.debugGraphics?.destroy();
+      this.debugGraphics = undefined;
+      return;
+    }
+
+    if (!this.debugText) {
+      this.debugText = this.add
+        .text(10, 50, '', {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#aaffaa'
+        })
+        .setScrollFactor(0)
+        .setDepth(2000)
+        .setAlpha(0.9);
+    }
+
+    if (!this.debugGraphics) {
+      this.debugGraphics = this.add.graphics().setDepth(1999);
+    }
+
+    this.redrawGoalDebugBounds();
   }
 
   private restartHero() {
@@ -254,11 +305,16 @@ class Game extends Phaser.Scene {
   private addHud() {
     // Minimal controls hint (camera-fixed).
     this.hudText = this.add
-      .text(10, 10, 'Move: ←/→  Jump: ↑/Space  Sprint: Shift  Restart: R', {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#ffffff'
-      })
+      .text(
+        10,
+        10,
+        'Move: ←/→  Jump: ↑/Space  Sprint: Shift  Restart: R  Debug: F3',
+        {
+          fontFamily: 'monospace',
+          fontSize: '14px',
+          color: '#ffffff'
+        }
+      )
       .setScrollFactor(0)
       .setDepth(1000)
       .setAlpha(0.8);
@@ -274,19 +330,7 @@ class Game extends Phaser.Scene {
       .setAlpha(0.95)
       .setVisible(false);
 
-    if (SHOW_LEVEL_DEBUG) {
-      this.debugText = this.add
-        .text(10, 50, '', {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: '#aaffaa'
-        })
-        .setScrollFactor(0)
-        .setDepth(2000)
-        .setAlpha(0.9);
-
-      this.debugGraphics = this.add.graphics().setDepth(1999);
-    }
+    this.setDebugMode(this.showLevelDebug);
   }
 
   private addHero() {
@@ -400,7 +444,7 @@ class Game extends Phaser.Scene {
     if (!this.exitPos) {
       this.exitPos = { ...fallback.exit };
       this.goalFallbacksUsed.push('exit');
-      if (SHOW_LEVEL_DEBUG) {
+      if (this.showLevelDebug) {
         console.warn(
           `[GameScene] Missing Exit object in ${this.currentLevelKey}; using fallback at ${fallback.exit.x},${fallback.exit.y}.`
         );
@@ -410,7 +454,7 @@ class Game extends Phaser.Scene {
     if (!this.keyPos) {
       this.keyPos = { ...fallback.key };
       this.goalFallbacksUsed.push('key');
-      if (SHOW_LEVEL_DEBUG) {
+      if (this.showLevelDebug) {
         console.warn(
           `[GameScene] Missing Key object in ${this.currentLevelKey}; using fallback at ${fallback.key.x},${fallback.key.y}.`
         );
@@ -642,7 +686,7 @@ class Game extends Phaser.Scene {
   }
 
   private redrawGoalDebugBounds() {
-    if (!SHOW_LEVEL_DEBUG) {
+    if (!this.showLevelDebug) {
       return;
     }
 
@@ -683,7 +727,11 @@ class Game extends Phaser.Scene {
       this.cameras.main.height
     ).y;
 
-    if (SHOW_LEVEL_DEBUG) {
+    if (Phaser.Input.Keyboard.JustDown(this.debugToggleKey)) {
+      this.setDebugMode(!this.showLevelDebug);
+    }
+
+    if (this.showLevelDebug) {
       this.debugText?.setText(
         [
           `level=${this.currentLevelKey} hasKey=${this.hasKey}`,
