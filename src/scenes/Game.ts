@@ -748,6 +748,12 @@ class Game extends Phaser.Scene {
       return;
     }
 
+    // The HUD says Space can restart after death — support that.
+    if (this.hero.isDead() && Phaser.Input.Keyboard.JustDown(this.jumpKey)) {
+      this.restartHero();
+      return;
+    }
+
     if (this.hero.isDead() && this.hero.getBounds().top > cameraBottom + 100) {
       this.restartHero();
     }
