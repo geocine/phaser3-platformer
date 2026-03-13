@@ -308,7 +308,7 @@ class Game extends Phaser.Scene {
       .text(
         10,
         10,
-        'Move: ←/→  Jump: ↑/Space  Sprint: Shift  Restart: R  Debug: F3',
+        '←/→ move  ↑/Space jump  Shift sprint  R restart  F3 debug',
         {
           fontFamily: 'monospace',
           fontSize: '14px',
