@@ -23,6 +23,8 @@ class Hero extends Phaser.GameObjects.Sprite {
   private readonly sprintJumpVelocity = 460;
   private readonly flipJumpVelocity = 300;
   private readonly maxFallVelocity = 520;
+  private readonly fastFallVelocity = 620;
+  private readonly fastFallGravityMultiplier = 1.35;
 
   constructor(
     scene: Phaser.Scene,
@@ -247,9 +249,18 @@ class Hero extends Phaser.GameObjects.Sprite {
       (this.controlState.jumpBufferedUntil ?? 0) > this.scene.time.now;
 
     const isSprinting = this.isSprintJumpActive();
+    const isFastFalling =
+      !this.isDead() && !this.body.onFloor() && this.keys.down.isDown;
+    const maxFallVelocity = isFastFalling
+      ? this.fastFallVelocity
+      : this.maxFallVelocity;
 
     // Sprinting is intentionally subtle: slightly higher top-speed + acceleration.
-    this.body.setMaxVelocity(isSprinting ? 340 : 250, this.maxFallVelocity);
+    this.body.setMaxVelocity(isSprinting ? 340 : 250, maxFallVelocity);
+    this.body.setGravityY(
+      this.scene.physics.world.gravity.y *
+        (isFastFalling ? this.fastFallGravityMultiplier - 1 : 0)
+    );
     const accelX = isSprinting ? 1500 : 1000;
 
     if (!this.isDead() && this.keys.left.isDown) {
