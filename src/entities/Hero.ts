@@ -24,6 +24,7 @@ class Hero extends Phaser.GameObjects.Sprite {
   private readonly flipJumpVelocity = 300;
   private readonly maxFallVelocity = 520;
   private readonly fastFallVelocity = 620;
+  private readonly descendingGravityMultiplier = 1.15;
   private readonly fastFallGravityMultiplier = 1.35;
 
   constructor(
@@ -251,15 +252,22 @@ class Hero extends Phaser.GameObjects.Sprite {
     const isSprinting = this.isSprintJumpActive();
     const isFastFalling =
       !this.isDead() && !this.body.onFloor() && this.keys.down.isDown;
+    const isDescending =
+      !this.isDead() && !this.body.onFloor() && this.body.velocity.y > 0;
     const maxFallVelocity = isFastFalling
       ? this.fastFallVelocity
       : this.maxFallVelocity;
+    const gravityMultiplier = isFastFalling
+      ? this.fastFallGravityMultiplier
+      : isDescending
+        ? this.descendingGravityMultiplier
+        : 1;
 
     // Sprinting is intentionally subtle: slightly higher top-speed + acceleration.
     this.body.setMaxVelocity(isSprinting ? 340 : 250, maxFallVelocity);
+    // Add extra gravity only after the jump apex so ascent height and jump cuts stay intact.
     this.body.setGravityY(
-      this.scene.physics.world.gravity.y *
-        (isFastFalling ? this.fastFallGravityMultiplier - 1 : 0)
+      this.scene.physics.world.gravity.y * (gravityMultiplier - 1)
     );
     const accelX = isSprinting ? 1500 : 1000;
 
