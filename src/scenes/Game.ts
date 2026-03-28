@@ -365,6 +365,10 @@ class Game extends Phaser.Scene {
       this.hero,
       this.spikeGroup,
       () => {
+        if (this.hero.isSpawnProtected()) {
+          return;
+        }
+
         this.hero.kill();
       }
     );

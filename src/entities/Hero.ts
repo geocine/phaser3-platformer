@@ -19,6 +19,7 @@ class Hero extends Phaser.GameObjects.Sprite {
   private readonly jumpBufferMs = 200;
   private readonly coyoteTimeMs = 120;
   private readonly flipGraceMs = 650;
+  private readonly spawnInvulnerabilityMs = 700;
   private readonly normalJumpVelocity = 400;
   private readonly sprintJumpVelocity = 460;
   private readonly flipJumpVelocity = 300;
@@ -26,6 +27,8 @@ class Hero extends Phaser.GameObjects.Sprite {
   private readonly fastFallVelocity = 620;
   private readonly descendingGravityMultiplier = 1.15;
   private readonly fastFallGravityMultiplier = 1.35;
+  private spawnInvulnerableUntil = 0;
+  private spawnBlinkTween?: Phaser.Tweens.Tween;
 
   constructor(
     scene: Phaser.Scene,
@@ -55,6 +58,7 @@ class Hero extends Phaser.GameObjects.Sprite {
 
     this.setupAnimation();
     this.setupMovement();
+    this.enableSpawnProtection();
   }
 
   setupAnimation() {
@@ -215,6 +219,7 @@ class Hero extends Phaser.GameObjects.Sprite {
 
   kill() {
     if (this.moveState.can('die')) {
+      this.clearSpawnProtection();
       this.moveState.die();
       this.animState.die();
       this.emit('died');
@@ -225,12 +230,41 @@ class Hero extends Phaser.GameObjects.Sprite {
     return this.moveState.is('dead');
   }
 
+  isSpawnProtected() {
+    return !this.isDead() && this.scene.time.now < this.spawnInvulnerableUntil;
+  }
+
   private isSprintJumpActive() {
     return !this.isDead() && (this.sprintKey ? this.sprintKey.isDown : false);
   }
 
+  private enableSpawnProtection() {
+    this.spawnInvulnerableUntil = this.scene.time.now + this.spawnInvulnerabilityMs;
+    this.setAlpha(0.45);
+
+    this.spawnBlinkTween?.remove();
+    this.spawnBlinkTween = this.scene.tweens.add({
+      targets: this,
+      alpha: { from: 0.35, to: 1 },
+      duration: 90,
+      yoyo: true,
+      repeat: -1
+    });
+  }
+
+  private clearSpawnProtection() {
+    this.spawnInvulnerableUntil = 0;
+    this.spawnBlinkTween?.remove();
+    this.spawnBlinkTween = undefined;
+    this.setAlpha(1);
+  }
+
   preUpdate(time: number, delta: number) {
     super.preUpdate(time, delta);
+
+    if (this.spawnInvulnerableUntil !== 0 && time >= this.spawnInvulnerableUntil) {
+      this.clearSpawnProtection();
+    }
 
     if (!this.isDead() && this.body.onFloor()) {
       this.controlState.lastOnFloorTime = this.scene.time.now;
@@ -316,6 +350,11 @@ class Hero extends Phaser.GameObjects.Sprite {
         break;
       }
     }
+  }
+
+  override destroy(fromScene?: boolean) {
+    this.clearSpawnProtection();
+    super.destroy(fromScene);
   }
 }
 
