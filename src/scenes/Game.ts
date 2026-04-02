@@ -18,6 +18,10 @@ const levelGoalFallbacks = {
 } as const;
 
 class Game extends Phaser.Scene {
+  private readonly cameraLookAheadX = 52;
+  private readonly cameraFallLookAheadY = 34;
+  private readonly cameraLookAheadLerp = 0.1;
+
   private cursorKeys!: Phaser.Types.Input.Keyboard.CursorKeys;
   private jumpKey!: Phaser.Input.Keyboard.Key;
   private restartKey!: Phaser.Input.Keyboard.Key;
@@ -350,6 +354,7 @@ class Game extends Phaser.Scene {
       this.map.heightInPixels
     );
     this.cameras.main.startFollow(this.hero);
+    this.cameras.main.followOffset.set(0, 0);
 
     this.children.moveTo(
       this.hero,
@@ -725,6 +730,47 @@ class Game extends Phaser.Scene {
     this.scene.start('GameScene', { levelKey: next });
   }
 
+  private updateCameraLookAhead() {
+    const camera = this.cameras.main;
+    const heroBody = this.hero.body;
+    const halfWidth = camera.width * 0.5;
+    const halfHeight = camera.height * 0.5;
+
+    const leftRoom = Math.max(this.hero.x - halfWidth, 0);
+    const rightRoom = Math.max(this.map.widthInPixels - (this.hero.x + halfWidth), 0);
+    const topRoom = Math.max(this.hero.y - halfHeight, 0);
+    const bottomRoom = Math.max(this.map.heightInPixels - (this.hero.y + halfHeight), 0);
+
+    const horizontalLookAhead = this.hero.isDead()
+      ? 0
+      : Phaser.Math.Clamp(
+          (heroBody.velocity.x / 280) * this.cameraLookAheadX,
+          -this.cameraLookAheadX,
+          this.cameraLookAheadX
+        );
+    const fallingLookAhead = this.hero.isDead()
+      ? 0
+      : Phaser.Math.Clamp(
+          Phaser.Math.Clamp(heroBody.velocity.y, 0, 520) / 520 * this.cameraFallLookAheadY,
+          0,
+          this.cameraFallLookAheadY
+        );
+
+    const targetOffsetX = Phaser.Math.Clamp(horizontalLookAhead, -leftRoom, rightRoom);
+    const targetOffsetY = Phaser.Math.Clamp(fallingLookAhead, -topRoom, bottomRoom);
+
+    camera.followOffset.x = Phaser.Math.Linear(
+      camera.followOffset.x,
+      targetOffsetX,
+      this.cameraLookAheadLerp
+    );
+    camera.followOffset.y = Phaser.Math.Linear(
+      camera.followOffset.y,
+      targetOffsetY,
+      this.cameraLookAheadLerp
+    );
+  }
+
   update(time, delta) {
     const cameraBottom = this.cameras.main.getWorldPoint(
       0,
@@ -761,6 +807,8 @@ class Game extends Phaser.Scene {
     if (this.hero.isDead() && this.hero.getBounds().top > cameraBottom + 100) {
       this.restartHero();
     }
+
+    this.updateCameraLookAhead();
   }
 }
 
