@@ -27,6 +27,8 @@ class Hero extends Phaser.GameObjects.Sprite {
   private readonly fastFallVelocity = 620;
   private readonly descendingGravityMultiplier = 1.15;
   private readonly fastFallGravityMultiplier = 1.35;
+  private readonly groundDragX = 750;
+  private readonly airDragX = 225;
   private spawnInvulnerableUntil = 0;
   private spawnBlinkTween?: Phaser.Tweens.Tween;
 
@@ -50,7 +52,7 @@ class Hero extends Phaser.GameObjects.Sprite {
     this.body.setSize(12, 40);
     this.body.setOffset(12, 23);
     this.body.setMaxVelocity(250, this.maxFallVelocity);
-    this.body.setDragX(750);
+    this.body.setDragX(this.groundDragX);
     this.controlState = {};
     this.keys = keys;
     this.jumpKey = jumpKey;
@@ -261,12 +263,13 @@ class Hero extends Phaser.GameObjects.Sprite {
 
   preUpdate(time: number, delta: number) {
     super.preUpdate(time, delta);
+    const isOnFloor = this.body.onFloor();
 
     if (this.spawnInvulnerableUntil !== 0 && time >= this.spawnInvulnerableUntil) {
       this.clearSpawnProtection();
     }
 
-    if (!this.isDead() && this.body.onFloor()) {
+    if (!this.isDead() && isOnFloor) {
       this.controlState.lastOnFloorTime = this.scene.time.now;
     }
 
@@ -285,9 +288,9 @@ class Hero extends Phaser.GameObjects.Sprite {
 
     const isSprinting = this.isSprintJumpActive();
     const isFastFalling =
-      !this.isDead() && !this.body.onFloor() && this.keys.down.isDown;
+      !this.isDead() && !isOnFloor && this.keys.down.isDown;
     const isDescending =
-      !this.isDead() && !this.body.onFloor() && this.body.velocity.y > 0;
+      !this.isDead() && !isOnFloor && this.body.velocity.y > 0;
     const maxFallVelocity = isFastFalling
       ? this.fastFallVelocity
       : this.maxFallVelocity;
@@ -299,6 +302,8 @@ class Hero extends Phaser.GameObjects.Sprite {
 
     // Sprinting is intentionally subtle: slightly higher top-speed + acceleration.
     this.body.setMaxVelocity(isSprinting ? 340 : 250, maxFallVelocity);
+    // Keep grounded stopping snappy, but preserve a bit more momentum after takeoff.
+    this.body.setDragX(isOnFloor ? this.groundDragX : this.airDragX);
     // Add extra gravity only after the jump apex so ascent height and jump cuts stay intact.
     this.body.setGravityY(
       this.scene.physics.world.gravity.y * (gravityMultiplier - 1)
