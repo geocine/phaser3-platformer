@@ -735,6 +735,9 @@ class Game extends Phaser.Scene {
     const heroBody = this.hero.body;
     const halfWidth = camera.width * 0.5;
     const halfHeight = camera.height * 0.5;
+    // Match the camera's fall look-ahead to the hero's live fall-speed cap,
+    // so fast-fall reaches the full offset instead of being compressed.
+    const currentMaxFallVelocity = Math.max(heroBody.maxVelocity.y, 1);
 
     const leftRoom = Math.max(this.hero.x - halfWidth, 0);
     const rightRoom = Math.max(this.map.widthInPixels - (this.hero.x + halfWidth), 0);
@@ -751,7 +754,9 @@ class Game extends Phaser.Scene {
     const fallingLookAhead = this.hero.isDead()
       ? 0
       : Phaser.Math.Clamp(
-          Phaser.Math.Clamp(heroBody.velocity.y, 0, 520) / 520 * this.cameraFallLookAheadY,
+          Phaser.Math.Clamp(heroBody.velocity.y, 0, currentMaxFallVelocity) /
+            currentMaxFallVelocity *
+            this.cameraFallLookAheadY,
           0,
           this.cameraFallLookAheadY
         );
