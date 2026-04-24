@@ -19,6 +19,8 @@ const levelGoalFallbacks = {
 
 class Game extends Phaser.Scene {
   private readonly cameraLookAheadX = 52;
+  private readonly cameraLookUpY = 40;
+  private readonly cameraLookDownY = 72;
   private readonly cameraFallLookAheadY = 34;
   private readonly cameraLookAheadLerp = 0.1;
 
@@ -755,9 +757,20 @@ class Game extends Phaser.Scene {
           0,
           this.cameraFallLookAheadY
         );
+    const manualVerticalLookAhead = this.hero.isDead()
+      ? 0
+      : this.cursorKeys.down.isDown
+        ? this.cameraLookDownY
+        : this.cursorKeys.up.isDown
+          ? -this.cameraLookUpY
+          : 0;
 
     const targetOffsetX = Phaser.Math.Clamp(horizontalLookAhead, -leftRoom, rightRoom);
-    const targetOffsetY = Phaser.Math.Clamp(fallingLookAhead, -topRoom, bottomRoom);
+    const targetOffsetY = Phaser.Math.Clamp(
+      fallingLookAhead + manualVerticalLookAhead,
+      -topRoom,
+      bottomRoom
+    );
 
     camera.followOffset.x = Phaser.Math.Linear(
       camera.followOffset.x,
