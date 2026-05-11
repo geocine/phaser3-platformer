@@ -8,7 +8,7 @@ class Hero extends Phaser.GameObjects.Sprite {
   private moveState!: any;
   private movePredicates!: Record<string, () => boolean>;
   private controlState: {
-    didPressJump?: boolean;
+    didJustPressJump?: boolean;
     jumpBufferedUntil?: number;
     lastOnFloorTime?: number;
   } = {};
@@ -16,7 +16,9 @@ class Hero extends Phaser.GameObjects.Sprite {
   private jumpKey?: Phaser.Input.Keyboard.Key;
   private sprintKey?: Phaser.Input.Keyboard.Key;
 
+  // Let a slightly-early jump press trigger on landing.
   private readonly jumpBufferMs = 200;
+  // Let the player still jump for a brief moment after walking off a ledge.
   private readonly coyoteTimeMs = 120;
   private readonly flipGraceMs = 650;
   private readonly spawnInvulnerabilityMs = 700;
@@ -204,7 +206,7 @@ class Hero extends Phaser.GameObjects.Sprite {
         const withinGrace = now - lastOnFloor <= this.flipGraceMs;
 
         return (
-          this.controlState.didPressJump &&
+          this.controlState.didJustPressJump &&
           !this.body.onFloor() &&
           (this.body.velocity.y < 0 || withinGrace)
         );
@@ -277,14 +279,12 @@ class Hero extends Phaser.GameObjects.Sprite {
       Phaser.Input.Keyboard.JustDown(this.keys.up) ||
       (this.jumpKey ? Phaser.Input.Keyboard.JustDown(this.jumpKey) : false);
 
+    this.controlState.didJustPressJump = !this.isDead() && didJustPressJump;
+
     if (!this.isDead() && didJustPressJump) {
       this.controlState.jumpBufferedUntil =
         this.scene.time.now + this.jumpBufferMs;
     }
-
-    this.controlState.didPressJump =
-      !this.isDead() &&
-      (this.controlState.jumpBufferedUntil ?? 0) > this.scene.time.now;
 
     const isSprinting = this.isSprintJumpActive();
     const isFastFalling =
